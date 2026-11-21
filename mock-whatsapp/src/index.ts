@@ -8,7 +8,7 @@ dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
-const port = parseInt(process.env.PORT || process.env.MOCK_WHATSAPP_PORT || '4001', 10);
+const port = parseInt(process.env.MOCK_WHATSAPP_PORT || '4001', 10);
 const host = process.env.HOST || '0.0.0.0';
 
 export interface WhatsAppMessage {
