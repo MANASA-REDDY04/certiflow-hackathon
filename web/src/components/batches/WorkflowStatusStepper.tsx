@@ -67,8 +67,10 @@ export default function WorkflowStatusStepper({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {STATUS_STEPS.map((step, idx) => {
-          let isCompleted = idx < currentIdx;
-          let isCurrent = idx === currentIdx;
+          // When status is 'issued', all steps including the last one are complete
+          const isFullyIssued = status === 'issued';
+          let isCompleted = isFullyIssued ? true : idx < currentIdx;
+          let isCurrent = isFullyIssued ? false : idx === currentIdx;
 
           // If Quality QA (idx === 3) and batch has < 50 candidates and has reached State Review or beyond
           const isQualityStep = idx === 3;

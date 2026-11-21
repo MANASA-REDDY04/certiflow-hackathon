@@ -53,8 +53,10 @@ export function getStatusStepIndex(status: string): number {
     case 'draft':
       return 0;
     case 'submitted':
+      // Awaiting district officers — highlight "2. Submitted"
+      return 1;
     case 'district_review':
-      // Submitted by training centre, now actively undergoing District Review
+      // District officers are actively reviewing — highlight "3. District Review"
       return 2;
     case 'quality_review':
       // 2 District officers approved; Quality QA is active
@@ -64,11 +66,11 @@ export function getStatusStepIndex(status: string): number {
       return 4;
     case 'approved':
     case 'state_approved':
-      // State Office approved; issuance in progress
+      // State Office approved; issuance in progress — highlight "6. Issued" as pending
       return 5;
     case 'issued':
-      // Complete end-to-end issuance
-      return 6;
+      // Complete end-to-end issuance — all steps done (index 5 = last step)
+      return 5;
     case 'sent_back':
       // Returned to Training Centre for corrections
       return 0;
