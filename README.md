@@ -50,54 +50,142 @@ A government skills programme issues certificates to trainees after their batche
 ### Architecture
 
 ```mermaid
-flowchart TD
-    subgraph Client
-        Browser["Browser (Next.js web:3000)"]
+flowchart TB
+    subgraph Client["CLIENT LAYER"]
+        B["Next.js Browser :3000"]
     end
 
-    subgraph API["API (Fastify api:4000)"]
-        Routes["REST Routes"]
+    subgraph API["API LAYER - Fastify :4000"]
+        R["REST Routes"]
         SM["Approval State Machine"]
-        PdfSvc["PDF Service (PDFKit)"]
-        CertSvc["Certificate Service"]
-        EscSvc["Escalation Service"]
-        EventBus["EventBus (Redis pub/sub)"]
+        CS["Certificate Service"]
+        PS["PDF Service - PDFKit"]
+        ES["Escalation Service"]
+        EB["EventBus"]
     end
 
-    subgraph Worker["Worker (pg-boss)"]
-        CertJob["certificate-issuance handler"]
-        SlaJob["sla-escalation-monitor (every 10s)"]
+    subgraph Workers["BACKGROUND WORKERS"]
+        CW["Certificate Issuance Handler"]
+        SW["SLA Escalation Monitor<br/>Every 10 seconds"]
     end
 
-    subgraph Storage
-        PG["PostgreSQL 16"]
-        Redis["Redis 7"]
-        FS["storage/private/certificates/ (local filesystem)"]
+    subgraph Storage["STORAGE LAYER"]
+        PG[("PostgreSQL 16")]
+        RD[("Redis 7")]
+        FS[("Private Certificate Storage")]
     end
 
-    Mock["Mock WhatsApp (Fastify:4001)"]
-    DBView["pgweb DB Viewer :8080"]
+    subgraph External["EXTERNAL / SUPPORT SERVICES"]
+        WA["Mock WhatsApp :4001"]
+        DB["pgweb DB Viewer :8080"]
+    end
 
-    Browser -->|"REST + JWT"| Routes
-    Browser -->|"SSE GET /api/events/stream"| EventBus
-    Routes --> SM
-    SM --> PG
-    SM -->|"after COMMIT"| CertSvc
-    CertSvc --> PdfSvc
-    PdfSvc --> FS
-    CertSvc -->|"HTTP POST /api/messages/send"| Mock
-    CertSvc -->|"enqueue certificate-issuance"| PG
-    Worker -->|"poll pg-boss"| PG
-    CertJob -->|"HTTP POST /api/worker/process-certificate-job"| Routes
-    SlaJob -->|"HTTP POST /api/escalations/trigger-scan"| Routes
-    EscSvc --> PG
-    EventBus -->|"publish"| Redis
-    Redis -->|"subscribe"| EventBus
-    EventBus -->|"SSE push"| Browser
-    DBView --> PG
+    B -->|"REST + JWT"| R
+    B <-->|"SSE"| EB
+
+    R --> SM
+    SM -->|"Transactions"| PG
+    SM -->|"After COMMIT"| CS
+
+    CS --> PS
+    PS --> FS
+    CS -->|"Send message"| WA
+    CS -->|"Enqueue job"| PG
+
+    PG -->|"Job polling"| CW
+    CW -->|"HTTP POST"| R
+    SW -->|"Trigger scan"| R
+
+    R --> ES
+    ES --> PG
+
+    EB <-->|"Pub/Sub"| RD
+    EB -->|"SSE events"| B
+
+    DB --> PG
 ```
 
 ### Event Flow: "Batch Approved" → "WhatsApp Delivered"
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    actor Officer as State Officer
+    participant Browser as Next.js Browser
+    participant API as Fastify API
+    participant SM as Approval State Machine
+    participant PG as PostgreSQL
+    participant Cert as Certificate Service
+    participant PDF as PDF Service
+    participant FS as Private File Storage
+    participant WA as Mock WhatsApp
+    participant Worker as pg-boss Worker
+    participant EB as EventBus
+    participant Redis as Redis Pub/Sub
+
+    Officer->>Browser: Approve Batch
+    Browser->>API: POST /api/batches/:id/decision
+    API->>SM: Process approval decision
+
+    rect rgb(225, 240, 255)
+        Note over SM,PG: Database Transaction
+        SM->>PG: BEGIN
+        SM->>PG: SELECT batch FOR UPDATE
+        SM->>PG: INSERT approval record
+        SM->>PG: COUNT approvals for quorum
+        SM->>PG: UPDATE batch status
+        SM->>PG: INSERT audit_log
+        SM->>PG: INSERT outbox_events
+        SM->>PG: COMMIT
+    end
+
+    alt Quorum achieved
+        SM->>Cert: processCertificateJob() per candidate
+
+        loop Each candidate
+            Cert->>PG: findOrCreateCertificate()
+            Note right of PG: INSERT ON CONFLICT DO UPDATE
+
+            Cert->>PDF: generateCertificatePdf()
+            PDF->>PDF: Generate A4 landscape PDF
+            PDF->>PDF: Embed QR verification URL
+            PDF->>FS: Save PDF
+            PDF->>PDF: Calculate SHA-256
+            PDF->>PG: Store certificate hash
+
+            Cert->>PG: Insert delivery row with idempotency_key
+            Cert->>Cert: Generate HMAC-SHA256 token (7-day expiry)
+
+            Cert->>WA: POST /api/messages/send
+            Note right of WA: Idempotency key header<br/>Download token in message
+
+            alt WhatsApp success
+                WA-->>Cert: HTTP 200 OK
+                Cert->>PG: Update delivery = delivered
+            else WhatsApp failure
+                WA-->>Cert: Error response
+                Cert->>PG: Update delivery = failed
+            end
+        end
+
+        Cert->>PG: Update batch status = issued
+        Cert->>PG: Enqueue certificate-issuance job
+        PG-->>Worker: pg-boss polls pending job
+        Worker->>API: POST /api/worker/process-certificate-job
+
+        API->>EB: Publish batch/certificate event
+        EB->>Redis: PUBLISH event
+        Redis-->>EB: Deliver to subscribers
+        EB-->>Browser: SSE push /api/events/stream
+        Browser->>Browser: Update UI in real time
+
+        API-->>Browser: Approval processing response
+    else Quorum not achieved
+        SM->>PG: Keep batch pending next approval
+        API-->>Browser: Approval recorded
+    end
+```
 
 1. State officer posts `POST /api/batches/:id/decision` with `{ "decision": "approve" }`.
 2. API opens a transaction: `SELECT ... FOR UPDATE` on the batch row, inserts the approval record, counts approvals for this round and step, advances `status` to `approved` if the quorum is met. Writes `audit_log` and `outbox_events` rows in the same transaction. Commits.
