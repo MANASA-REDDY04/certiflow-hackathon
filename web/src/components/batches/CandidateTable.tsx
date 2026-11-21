@@ -18,6 +18,14 @@ export default function CandidateTable({
 }: CandidateTableProps) {
   const hasAnyCerts = candidates.some((c) => c.certificate);
 
+  // Calculate cohort performance metrics for reviewing officers
+  const scores = candidates.map((c) => Number(c.score)).filter((s) => !isNaN(s));
+  const passCount = scores.filter((s) => s >= 50).length;
+  const avgScore =
+    scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : 0;
+  const passRate = scores.length > 0 ? Math.round((passCount / scores.length) * 100) : 0;
+  const certsCount = candidates.filter((c) => c.certificate).length;
+
   return (
     <div className="space-y-3 pt-4 border-t border-slate-100">
       <div className="flex items-center justify-between">
@@ -35,6 +43,32 @@ export default function CandidateTable({
           </button>
         )}
       </div>
+
+      {/* Cohort Performance Chips */}
+      {candidates.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+            <span className="text-[10px] text-slate-500 uppercase font-semibold block">Total Cohort</span>
+            <span className="text-base font-extrabold text-slate-900">{candidates.length} trainees</span>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
+            <span className="text-[10px] text-emerald-700 uppercase font-semibold block">Eligible (&ge;50)</span>
+            <span className="text-base font-extrabold text-emerald-800">
+              {passCount} <span className="text-xs font-medium">({passRate}%)</span>
+            </span>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+            <span className="text-[10px] text-blue-700 uppercase font-semibold block">Average Score</span>
+            <span className="text-base font-extrabold text-blue-800">{avgScore} / 100</span>
+          </div>
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
+            <span className="text-[10px] text-purple-700 uppercase font-semibold block">Certificates Issued</span>
+            <span className="text-base font-extrabold text-purple-800">
+              {certsCount} / {passCount}
+            </span>
+          </div>
+        </div>
+      )}
 
       {candidates.length > 0 ? (
         <div className="overflow-x-auto border border-slate-200 rounded-lg">

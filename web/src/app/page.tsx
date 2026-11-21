@@ -253,14 +253,6 @@ export default function Home() {
               jwtToken={jwtToken}
             />
 
-            {activeUser && (
-              <div className="hidden sm:flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 text-xs">
-                <span className="text-slate-500">Active:</span>
-                <span className="font-bold text-slate-800">{activeUser.name}</span>
-                {getRoleBadge(activeUser.role)}
-              </div>
-            )}
-
             <div
               className={`flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium border ${
                 health?.status === 'ok'
@@ -281,6 +273,50 @@ export default function Home() {
               >
                 <RefreshCw className={`w-3 h-3 ${healthLoading ? 'animate-spin' : ''}`} />
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick 1-Click Persona Bar */}
+        <div className="bg-slate-50 border-t border-slate-200 px-4 sm:px-6 lg:px-8 py-2">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center space-x-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <Users className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Switch Persona (1-Click):</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {users.map((user) => {
+                const isCurrent = activeUser?.id === user.id;
+                let roleColor = 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100';
+                let activeColor = '';
+
+                if (user.role === 'training_centre') {
+                  activeColor = 'bg-emerald-600 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-400/30 font-bold';
+                } else if (user.role === 'district_officer') {
+                  activeColor = 'bg-blue-600 text-white border-blue-700 shadow-xs ring-2 ring-blue-400/30 font-bold';
+                } else if (user.role === 'quality_team') {
+                  activeColor = 'bg-purple-600 text-white border-purple-700 shadow-xs ring-2 ring-purple-400/30 font-bold';
+                } else if (user.role === 'state_office') {
+                  activeColor = 'bg-amber-600 text-white border-amber-700 shadow-xs ring-2 ring-amber-400/30 font-bold';
+                }
+
+                return (
+                  <button
+                    key={user.id}
+                    onClick={() => handleLogin(user)}
+                    disabled={loading}
+                    className={`px-3 py-1 rounded-full text-xs transition border flex items-center space-x-1.5 ${
+                      isCurrent ? activeColor : roleColor
+                    }`}
+                  >
+                    <span>{user.name}</span>
+                    <span className={`text-[10px] opacity-80 ${isCurrent ? 'text-white' : 'text-slate-500'}`}>
+                      ({user.role.replace('_', ' ')})
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

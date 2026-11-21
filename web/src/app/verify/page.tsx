@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ShieldCheck,
@@ -28,7 +28,7 @@ interface VerifyResult {
   cached?: boolean;
 }
 
-export default function VerifyPage() {
+function VerifyContent() {
   const searchParams = useSearchParams();
   const [certNumber, setCertNumber] = useState<string>('');
   const [verifyCode, setVerifyCode] = useState<string>('');
@@ -269,5 +269,19 @@ export default function VerifyPage() {
         CertiFlow &bull; Skills Programme Public Verification Registry
       </footer>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+          <div className="text-slate-500 text-sm font-medium">Loading verification portal...</div>
+        </div>
+      }
+    >
+      <VerifyContent />
+    </Suspense>
   );
 }
