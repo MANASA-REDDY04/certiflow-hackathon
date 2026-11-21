@@ -1,0 +1,21 @@
+{
+  "name": "certiflow-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CertiFlow - Certificate issuance platform monorepo",
+  "workspaces": [
+    "api",
+    "web",
+    "worker",
+    "mock-whatsapp"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "build:all": "npm run build --workspaces",
+    "dev:api": "npm --workspace=@certiflow/api run dev",
+    "dev:web": "npm --workspace=@certiflow/web run dev",
+    "dev:worker": "npm --workspace=@certiflow/worker run dev",
+    "dev:mock": "npm --workspace=@certiflow/mock-whatsapp run dev",
+    "test": "npm --workspace=@certiflow/api test"
+  }
+}
